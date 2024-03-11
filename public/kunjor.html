@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar/dist/mindar-image-aframe.prod.js"></script>
+</head>
+<body>
+    <div id="loadingScreen">Loading...</div>
+
+    <a-scene id="ar-scene" embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        <a-assets id="dynamic-assets">
+            <!-- Video and other dynamic assets will be added here -->
+        </a-assets>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+        <!-- AR content will be dynamically added here -->
+    </a-scene>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const qrDataParam = localStorage.getItem('qrData');
+            if (!qrDataParam) {
+                console.error('qrData not found in localStorage.');
+                return;
+            }
+            
+            try {
+                const qrData = JSON.parse(qrDataParam);
+                initializeAR(qrData);
+            } catch (error) {
+                console.error('Error parsing qrData from localStorage:', error);
+            }
+        });
+
+        function initializeAR(qrData) {
+            if (!qrData.mindFileUrl || !Array.isArray(qrData.videoFileUrls) || qrData.videoFileUrls.length === 0) {
+                console.error('Invalid qrData format or missing data:', qrData);
+                return;
+            }
+            
+            const sceneEl = document.getElementById('ar-scene');
+            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${qrData.mindFileUrl}`);
+            
+            loadVideoAssets(qrData.videoFileUrls, () => {
+                console.log('Video assets loaded, AR content can be initialized.');
+                hideLoadingScreen();
+            });
+        }
+
+        function loadVideoAssets(videoFileUrls, callback) {
+            const assets = document.getElementById('dynamic-assets');
+            videoFileUrls.forEach((url, index) => {
+                const videoId = `video${index}`;
+                const video = document.createElement('video');
+                video.id = videoId;
+                video.src = url;
+                video.preload = 'auto';
+                video.autoplay = true;
+                video.loop = true;
+                video.playsInline = true;
+                video.crossOrigin = 'anonymous';
+                assets.appendChild(video);
+                
+                video.onloadeddata = () => {
+                    console.log(`Video file ${index} loaded:`, url);
+                    if (index === videoFileUrls.length - 1) callback();
+                };
+                video.onerror = () => console.error(`Failed to load video file ${index}:`, url);
+            });
+        }
+
+        function hideLoadingScreen() {
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('ar-scene').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
