@@ -9,15 +9,12 @@
     <div id="loadingScreen">Loading...</div>
 
     <a-scene id="ar-scene" embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-        <a-assets id="dynamic-assets">
-            <!-- Video and other dynamic assets will be added here -->
-        </a-assets>
+        <a-assets id="dynamic-assets"></a-assets>
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-        <!-- AR content will be dynamically added here -->
     </a-scene>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             const qrDataParam = localStorage.getItem('qrData');
             if (!qrDataParam) {
                 console.error('qrData not found in localStorage.');
@@ -26,68 +23,74 @@
             
             try {
                 const qrData = JSON.parse(qrDataParam);
-                initializeAR(qrData);
+                await initializeAR(qrData);
             } catch (error) {
                 console.error('Error parsing qrData from localStorage:', error);
             }
         });
 
-        function initializeAR(qrData) {
+        async function initializeAR(qrData) {
             if (!qrData.mindFileUrl || !Array.isArray(qrData.videoFileUrls) || qrData.videoFileUrls.length === 0) {
-        console.error('Invalid qrData format or missing data:', qrData);
-        return;
-    }
-    
-    const sceneEl = document.getElementById('ar-scene');
-    sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${qrData.mindFileUrl}`);
+                console.error('Invalid qrData format or missing data:', qrData);
+                return;
+            }
 
-    // Assuming the first video URL in the array is the one you want to overlay
-    const videoSrc = qrData.videoFileUrls[0]; // Adjust if your logic differs
-    loadVideoAssets([videoSrc], () => {
-        console.log('Video assets loaded, initializing AR content.');
-        createVideoOverlay(videoSrc);
-        hideLoadingScreen();
-    });
-}
+            const sceneEl = document.getElementById('ar-scene');
+            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${qrData.mindFileUrl}`);
 
-function createVideoOverlay(videoSrc) {
-    const sceneEl = document.getElementById('ar-scene');
-    const videoElId = `video${0}`; // Adjust based on your logic for handling multiple videos
-
-    // Create an entity to represent the AR target area where the video will be displayed
-    const arTarget = document.createElement('a-entity');
-    arTarget.setAttribute('mindar-image-target', 'targetIndex: 0'); // Adjust targetIndex based on your target
-    
-    // Create a video plane that uses the loaded video as a texture
-    const videoPlane = document.createElement('a-video');
-    videoPlane.setAttribute('src', `#${videoElId}`);
-    videoPlane.setAttribute('width', '1'); // Adjust based on the aspect ratio of your video
-    videoPlane.setAttribute('height', '0.56'); // Adjust based on the aspect ratio of your video
-    videoPlane.setAttribute('position', '0 0 0'); // Adjust if you need to offset the video
-
-    arTarget.appendChild(videoPlane);
-    sceneEl.appendChild(arTarget);
-}
-        function loadVideoAssets(videoFileUrls, callback) {
-            const assets = document.getElementById('dynamic-assets');
-            videoFileUrls.forEach((url, index) => {
-                const videoId = `video${index}`;
-                const video = document.createElement('video');
-                video.id = videoId;
-                video.src = url;
-                video.preload = 'auto';
-                video.autoplay = true;
-                video.loop = true;
-                video.playsInline = true;
-                video.crossOrigin = 'anonymous';
-                assets.appendChild(video);
-                
-                video.onloadeddata = () => {
-                    console.log(`Video file ${index} loaded:`, url);
-                    if (index === videoFileUrls.length - 1) callback();
-                };
-                video.onerror = () => console.error(`Failed to load video file ${index}:`, url);
+            await loadVideoAssets(qrData.videoFileUrls);
+            qrData.videoFileUrls.forEach((videoSrc, index) => {
+                createVideoOverlay(videoSrc, index);
             });
+            hideLoadingScreen();
+        }
+
+        async function loadVideoAssets(videoFileUrls) {
+            return new Promise(resolve => {
+                const assets = document.getElementById('dynamic-assets');
+                let loadedCount = 0;
+
+                videoFileUrls.forEach((url, index) => {
+                    const videoId = `video${index}`;
+                    const video = document.createElement('video');
+                    video.id = videoId;
+                    video.src = url;
+                    video.preload = 'auto';
+                    video.autoplay = true;
+                    video.loop = true;
+                    video.playsInline = true;
+                    video.crossOrigin = 'anonymous';
+                    assets.appendChild(video);
+
+                    video.onloadeddata = () => {
+                        console.log(`Video file ${index} loaded:`, url);
+                        loadedCount++;
+                        if (loadedCount === videoFileUrls.length) resolve();
+                    };
+                    video.onerror = () => {
+                        console.error(`Failed to load video file ${index}:`, url);
+                        loadedCount++;
+                        if (loadedCount === videoFileUrls.length) resolve();
+                    };
+                });
+            });
+        }
+
+        function createVideoOverlay(videoSrc, index) {
+            const sceneEl = document.getElementById('ar-scene');
+            const videoElId = `video${index}`;
+
+            const arTarget = document.createElement('a-entity');
+            arTarget.setAttribute('mindar-image-target', `targetIndex: ${index}`);
+            
+            const videoPlane = document.createElement('a-video');
+            videoPlane.setAttribute('src', `#${videoElId}`);
+            videoPlane.setAttribute('width', '1');
+            videoPlane.setAttribute('height', '0.56');
+            videoPlane.setAttribute('position', '0 0 0');
+            
+            arTarget.appendChild(videoPlane);
+            sceneEl.appendChild(arTarget);
         }
 
         function hideLoadingScreen() {
