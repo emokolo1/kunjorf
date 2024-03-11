@@ -34,19 +34,40 @@
 
         function initializeAR(qrData) {
             if (!qrData.mindFileUrl || !Array.isArray(qrData.videoFileUrls) || qrData.videoFileUrls.length === 0) {
-                console.error('Invalid qrData format or missing data:', qrData);
-                return;
-            }
-            
-            const sceneEl = document.getElementById('ar-scene');
-            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${qrData.mindFileUrl}`);
-            
-            loadVideoAssets(qrData.videoFileUrls, () => {
-                console.log('Video assets loaded, AR content can be initialized.');
-                hideLoadingScreen();
-            });
-        }
+        console.error('Invalid qrData format or missing data:', qrData);
+        return;
+    }
+    
+    const sceneEl = document.getElementById('ar-scene');
+    sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${qrData.mindFileUrl}`);
 
+    // Assuming the first video URL in the array is the one you want to overlay
+    const videoSrc = qrData.videoFileUrls[0]; // Adjust if your logic differs
+    loadVideoAssets([videoSrc], () => {
+        console.log('Video assets loaded, initializing AR content.');
+        createVideoOverlay(videoSrc);
+        hideLoadingScreen();
+    });
+}
+
+function createVideoOverlay(videoSrc) {
+    const sceneEl = document.getElementById('ar-scene');
+    const videoElId = `video${0}`; // Adjust based on your logic for handling multiple videos
+
+    // Create an entity to represent the AR target area where the video will be displayed
+    const arTarget = document.createElement('a-entity');
+    arTarget.setAttribute('mindar-image-target', 'targetIndex: 0'); // Adjust targetIndex based on your target
+    
+    // Create a video plane that uses the loaded video as a texture
+    const videoPlane = document.createElement('a-video');
+    videoPlane.setAttribute('src', `#${videoElId}`);
+    videoPlane.setAttribute('width', '1'); // Adjust based on the aspect ratio of your video
+    videoPlane.setAttribute('height', '0.56'); // Adjust based on the aspect ratio of your video
+    videoPlane.setAttribute('position', '0 0 0'); // Adjust if you need to offset the video
+
+    arTarget.appendChild(videoPlane);
+    sceneEl.appendChild(arTarget);
+}
         function loadVideoAssets(videoFileUrls, callback) {
             const assets = document.getElementById('dynamic-assets');
             videoFileUrls.forEach((url, index) => {
