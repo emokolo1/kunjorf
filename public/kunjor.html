@@ -77,7 +77,7 @@
         
                         const videoEntity = document.createElement('a-entity');
                         videoEntity.setAttribute('mindar-image-target', 'targetIndex: ' + (i - 1));
-                        videoEntity.setAttribute('geometry', 'primitive: plane; height: 1');
+                        videoEntity.setAttribute('geometry', { 'primitive': 'plane', 'width': '1.125', 'height': '2'});
                         videoEntity.setAttribute('material', 'shader: flat; src: #video' + i);
                         arScene.appendChild(videoEntity);
         
