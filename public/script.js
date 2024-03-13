@@ -18,13 +18,14 @@ function onScanSuccess(decodedText, decodedResult) {
         if (data.alert === "error") {
             console.log("Error:", data.error);
             showPopup(data.error);
-        } else if (data.data.qrData && data.data.qrData.status === "enabled") { // Corrected access to status
-            localStorage.setItem('qrData', JSON.stringify(data.data.qrData)); // Ensure you're storing the qrData
+        } else if (data.data && data.data.status === "enabled") { // Correctly access the status
+            localStorage.setItem('qrData', JSON.stringify(data.data)); // Adjust to store the correct part of data
             window.location.href = 'kunjor.html';
         } else {
             showPopup("Collection not approved yet.");
         }
     })
+    
     .catch(err => {
         console.error("Fetch error:", err);
         showPopup('Error fetching data.');
