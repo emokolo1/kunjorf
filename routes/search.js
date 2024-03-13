@@ -3,13 +3,18 @@ const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
 
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
 // Define the Asset schema and model directly within this script
 const assetSchema = new mongoose.Schema({
   collectionName: String,
   mindFileUrl: String,
   videoFileUrls: [String],
   qrCodeUrl: String,
-  status: String
+  status: String,
 });
 
 // Create the model from the schema
@@ -23,30 +28,32 @@ router.get('/search', async (req, res) => {
       return res.status(400).json({ alert: "error", error: "No collection name provided." });
     }
 
-    // Directly use the query parameter without transforming it
     const collectionNameQuery = decodeURIComponent(collection_name);
-    
-    console.log(`Searching for collectionName: '${collectionNameQuery}'`); // Debugging
+   
 
     const result = await Asset.findOne({ collectionName: collectionNameQuery });
 
     if (result) {
-      console.log("Found result:", result); // Debugging
-      
-      // Specifically wrap the result in a 'qrData' object
-      const qrData = {
-        qrData: {
-          collectionName: result.collectionName,
-          mindFileUrl: result.mindFileUrl,
-          videoFileUrls: result.videoFileUrls,
-          status: result.status
-        }
+
+      let data = [];
+
+      for (let i = 0; i < result.videoFileUrls.length; i++) {
+        // Assuming each video URL should be paired with the same mind file URL
+        let pair = {};
+        pair[`mind${i + 1}`] = result.mindFileUrl;
+        pair[`video${i + 1}`] = result.videoFileUrls[i];
+        data.push(pair);
+      }
+
+      let qrData = {
+        collectionName: result.collectionName,
+        status: result.status,
+        data: data // Now 'data' is an array of objects
       };
 
-      // Send the wrapped qrData object
       res.json({ alert: "success", data: qrData });
+      console.log("QR Data :", qrData);
     } else {
-      console.log("No results found for:", collectionNameQuery); // Debugging
       res.status(404).json({ alert: "error", error: "No results found for the specified collection name." });
     }
   } catch (error) {
@@ -54,5 +61,6 @@ router.get('/search', async (req, res) => {
     res.status(500).json({ alert: "error", error: "Database error" });
   }
 });
+
 
 module.exports = router;
