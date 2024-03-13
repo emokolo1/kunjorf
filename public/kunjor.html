@@ -3,100 +3,94 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar/dist/mindar-image-aframe.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
 </head>
 <body>
     <div id="loadingScreen">Loading...</div>
 
-    <a-scene id="ar-scene" embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-        <a-assets id="dynamic-assets"></a-assets>
+    <a-scene id="ar-scene" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        <a-assets id="dynamic-assets" timeout="300000">
+            <!-- Dynamic assets will be added here -->
+        </a-assets>
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
     </a-scene>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Document loaded, initializing script.');
+        
             const qrDataParam = localStorage.getItem('qrData');
+            console.log('Retrieved qrDataParam from localStorage: ', qrDataParam);
+        
             if (!qrDataParam) {
-                console.error('qrData not found in localStorage.');
+                console.error('qrData not found in localStorage');
                 return;
             }
-            
-            try {
-                const qrData = JSON.parse(qrDataParam);
-                await initializeAR(qrData);
-            } catch (error) {
-                console.error('Error parsing qrData from localStorage:', error);
+        
+            const qrDataObject = JSON.parse(qrDataParam);
+            console.log('Parsed qrDataObject: ', qrDataObject);
+        
+            if (!qrDataObject.data || !Array.isArray(qrDataObject.data) || qrDataObject.data.length === 0) {
+                console.error('Invalid qrData format');
+                return;
             }
+        
+            const arScene = document.getElementById('ar-scene');
+            const assets = document.getElementById('dynamic-assets');
+            let videoElements = {};
+        
+            qrDataObject.data.forEach((qrData, index) => {
+                console.log('Using qrData: ', qrData);
+        
+                // Here you might need to adjust your approach if you want to support multiple mind files.
+                const mindFile = qrData['mind' + (index + 1)]; // This line needs to be inside the loop.
+                if (mindFile) {
+                    arScene.setAttribute('mindar-image', 'imageTargetSrc: ' + mindFile);
+                }
+        
+                for (let i = 1; i <= 10; i++) {
+                    const videoUrl = qrData['video' + i];
+        
+                    if (videoUrl) {
+                        if (!videoElements['video' + i]) {
+                            const videoElement = document.createElement('video');
+                            videoElement.id = 'video' + i;
+                            videoElement.src = videoUrl;
+                            videoElement.preload = 'auto';
+                            videoElement.crossOrigin = 'anonymous';
+                            videoElement.playsInline = true;
+                            videoElement.autoplay = true;
+                            videoElement.loop = true;
+                            videoElement.muted = true;
+        
+                            videoElement.addEventListener('loadeddata', function() {
+                                this.play().catch(e => console.log('Autoplay not allowed for video ' + i + ': ' + e.message));
+                            });
+        
+                            videoElement.addEventListener('error', function(e) {
+                                console.error('Error loading video ' + i + ':', e);
+                            });
+        
+                            assets.appendChild(videoElement);
+                            videoElements['video' + i] = videoElement;
+                        }
+        
+                        const videoEntity = document.createElement('a-entity');
+                        videoEntity.setAttribute('mindar-image-target', 'targetIndex: ' + (i - 1));
+                        videoEntity.setAttribute('geometry', 'primitive: plane; height: 1');
+                        videoEntity.setAttribute('material', 'shader: flat; src: #video' + i);
+                        arScene.appendChild(videoEntity);
+        
+                        console.log('Video entity for target ' + i + ' added to scene.');
+                    }
+                }
+            });
+        
+            localStorage.removeItem('qrData');
+            console.log('Cleared qrData from localStorage.');
         });
+        </script>
+        
 
-        async function initializeAR(qrData) {
-            if (!qrData.mindFileUrl || !Array.isArray(qrData.videoFileUrls) || qrData.videoFileUrls.length === 0) {
-                console.error('Invalid qrData format or missing data:', qrData);
-                return;
-            }
-
-            const sceneEl = document.getElementById('ar-scene');
-            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${qrData.mindFileUrl}`);
-
-            await loadVideoAssets(qrData.videoFileUrls);
-            qrData.videoFileUrls.forEach((videoSrc, index) => {
-                createVideoOverlay(videoSrc, index);
-            });
-            hideLoadingScreen();
-        }
-
-        async function loadVideoAssets(videoFileUrls) {
-            return new Promise(resolve => {
-                const assets = document.getElementById('dynamic-assets');
-                let loadedCount = 0;
-
-                videoFileUrls.forEach((url, index) => {
-                    const videoId = `video${index}`;
-                    const video = document.createElement('video');
-                    video.id = videoId;
-                    video.src = url;
-                    video.preload = 'auto';
-                    video.autoplay = true;
-                    video.loop = true;
-                    video.playsInline = true;
-                    video.crossOrigin = 'anonymous';
-                    assets.appendChild(video);
-
-                    video.onloadeddata = () => {
-                        console.log(`Video file ${index} loaded:`, url);
-                        loadedCount++;
-                        if (loadedCount === videoFileUrls.length) resolve();
-                    };
-                    video.onerror = () => {
-                        console.error(`Failed to load video file ${index}:`, url);
-                        loadedCount++;
-                        if (loadedCount === videoFileUrls.length) resolve();
-                    };
-                });
-            });
-        }
-
-        function createVideoOverlay(videoSrc, index) {
-            const sceneEl = document.getElementById('ar-scene');
-            const videoElId = `video${index}`;
-
-            const arTarget = document.createElement('a-entity');
-            arTarget.setAttribute('mindar-image-target', `targetIndex: ${index}`);
-            
-            const videoPlane = document.createElement('a-video');
-            videoPlane.setAttribute('src', `#${videoElId}`);
-            videoPlane.setAttribute('width', '1');
-            videoPlane.setAttribute('height', '0.56');
-            videoPlane.setAttribute('position', '0 0 0.1');
-            
-            arTarget.appendChild(videoPlane);
-            sceneEl.appendChild(arTarget);
-        }
-
-        function hideLoadingScreen() {
-            document.getElementById('loadingScreen').style.display = 'none';
-            document.getElementById('ar-scene').style.display = 'block';
-        }
-    </script>
 </body>
 </html>
